@@ -7,7 +7,7 @@ import numpy as np
 app = Flask(__name__)
 
 # Load the saved model
-with open("/Users/phattharapongduangkham/Documents/KMUTT/Proj_Room_Sec/CIRCUITS_Project/libraries_Main/known_faces.pkl", "rb") as f:
+with open("/Users/phattharapongduangkham/Documents/KMUTT/Proj_Room_Sec/CIRCUITS_Project/face_id/model/known_faces.pkl", "rb") as f:
     known_faces = pickle.load(f)
 
 video_capture = cv2.VideoCapture(1)
