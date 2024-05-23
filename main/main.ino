@@ -21,35 +21,13 @@ IPAddress pingAddr(192, 168, 2, 39);
 unsigned long lastPingTime = 0;
 Pinger pinger;
 
-///
-
-
-
 
 ///////////// wake on land /////////////////////////
-
 #include <WakeOnLan.h>
 
 WiFiUDP UDP;
 WakeOnLan WOL(UDP);
-
-
-void wakeMyPC() {
-    const char *MACAddress = "B4:2E:99:EE:43:3F";
-  
-    WOL.sendMagicPacket(MACAddress); // Send Wake On Lan packet with the above MAC address. Default to port 9.
-    // WOL.sendMagicPacket(MACAddress, 7); // Change the port number
-}
 ////////////////////////////////////////////////////
-
-
-
-
-
-
-
-
-
 //rfid
 #include <SPI.h>
 #include <MFRC522.h>
@@ -60,7 +38,6 @@ constexpr uint8_t SS_PIN = D4;     // Configurable, see typical pin layout above
 MFRC522 rfid(SS_PIN, RST_PIN); // Instance of the class
 MFRC522::MIFARE_Key key;
 String tag;
-
 //sensor DHT
 #include <DHT.h>               
 #define DHTPIN  D2              
@@ -70,7 +47,6 @@ WidgetLED LED_DHT22_ONLINE(V7);
 WidgetLED LED_DHT22_OFFLINE(V8);
 float humn; //humidity
 float temp; //temperature
-
 //sensor PIR
 int PIR = D1;
 int pir_val = 0;
@@ -88,9 +64,6 @@ int Buzzer = D8;
 #define TOKENCOUNT  1  //How many token that you want to send? (Size of array below)
 #define LINE_TOKEN "wmM1qDFQ8FyVmFHdTKuj2x1bneSsPEpXDV29jB5zuBl"
 int send_once = 0;
-
-
-
 
 String IPCAM_IP  =  "192.168.2.37:8888";
 bool ipCameraEnabled = true; 
@@ -235,27 +208,7 @@ void loop() { //Start loop
   get_pir();   //motion sensor
   Blynk.run(); //start blynk 
   ////////////////////////////////////////////////////////////////
- 
-  unsigned long currentTime = millis();
-  
-  // Check if it's time to ping
-  if (currentTime - lastPingTime >= pingInterval) {
-    lastPingTime = currentTime; // Update last ping time
-
-    pinger.Ping(IPAddress(192, 168, 2, 39));
-
-    pinger.OnReceive([](const PingerResponse& response) {
-      if (response.ReceivedResponse) {
-        Serial.println("response.ReceivedResponse เชื่อมต่อแล้ว");
-      } else {
-        Serial.println("response.ReceivedResponse เชื่อมต่อล้มเหลว");
-      }
-      return false; // Stop ping sequence after the first response
-    });
-
-    // Perform ping
-    
-  }
+  ping();
 
 //   /* PIR SENSOR */
 //   if(pir_on){
@@ -411,322 +364,3 @@ void loop() { //Start loop
 //  delay(delay_loop);
 } //END LOOP
 
-
-
-void CheckConnection(){
-  Connected2Blynk = Blynk.connected();
-  if(!Connected2Blynk){
-    Serial.println("Not connected to Blynk server"); 
-    Blynk.connect(3333);  // timeout set to 10 seconds and then continue without Blynk  
-  }
-  else{
-    Serial.println("Connected to Blynk server");     
-  }
-}
-
-
-
-//////////////////////////////////////////////////////////////////
-/* function camera download */
-void downloadAndSaveFile(String fileName, String  url){
-  
-  HTTPClient http;
-
-  Serial.println("[HTTP] begin...\n");
-  Serial.println(fileName);
-  Serial.println(url);
-  http.begin(url);
-  
-  Serial.printf("[HTTP] GET...\n", url.c_str());
-  // start connection and send HTTP header
-  int httpCode = http.GET();
-  if(httpCode > 0) {
-      // HTTP header has been send and Server response header has been handled
-      Serial.printf("[HTTP] GET... code: %d\n", httpCode);
-      Serial.printf("[FILE] open file for writing %d\n", fileName.c_str());
-      
-      File file = SPIFFS.open(fileName, "w");
-
-      // file found at server
-      if(httpCode == HTTP_CODE_OK) {
-
-          // get lenght of document (is -1 when Server sends no Content-Length header)
-          int len = http.getSize();
-
-          // create buffer for read
-          uint8_t buff[128] = { 0 };
-
-          // get tcp stream
-          WiFiClient * stream = http.getStreamPtr();
-
-          // read all data from server
-          while(http.connected() && (len > 0 || len == -1)) {
-              // get available data size
-              size_t size = stream->available();
-              if(size) {
-                  // read up to 128 byte
-                  int c = stream->readBytes(buff, ((size > sizeof(buff)) ? sizeof(buff) : size));
-                  // write it to Serial
-                  //Serial.write(buff, c);
-                  file.write(buff, c);
-                  if(len > 0) {
-                      len -= c;
-                  }
-              }
-              delay(1);
-          }
-
-          Serial.println();
-          Serial.println("[HTTP] connection closed or file end.\n");
-          Serial.println("[FILE] closing file\n");
-          file.close();
-          
-      }
-      
-  }
-  http.end();
-}
-//////////////////////////////////////////////////////////////////
-
-//////////////////////////////////////////////////////////////////
-/* camera */
-void listFiles(void) {
-  Serial.println();
-  Serial.println("SPIFFS files found:");
-
-  Dir dir = SPIFFS.openDir("/"); // Root directory
-  String  line = "=====================================";
-
-  Serial.println(line);
-  Serial.println("  File name               Size");
-  Serial.println(line);
-
-  while (dir.next()) {
-    String fileName = dir.fileName();
-    Serial.print(fileName);
-    int spaces = 25 - fileName.length(); // Tabulate nicely
-    while (spaces--) Serial.print(" ");
-    File f = dir.openFile("r");
-    Serial.print(f.size()); Serial.println(" bytes");
-  }
-
-  Serial.println(line);
-  Serial.println();
-  //delay(1000);
-}
-//////////////////////////////////////////////////////////////////
-
-//////////////////////////////////////////////////////////////////
-void chk_camera(){
-  if(ipCameraEnabled){
-    //Initialize File System
-    if(SPIFFS.begin()){
-      Serial.println("SPIFFS Initialize....ok");
-    }else{
-      Serial.println("SPIFFS Initialization...failed");
-    }
-   
-    //Format File System
-    if(SPIFFS.format()){
-      Serial.println("File System Formated");
-    }else{
-      Serial.println("File System Formatting Error");
-    }
-  }
-}
-//func send image
-void sendLineNotify(){
-      
-     downloadAndSaveFile("/snapshot.jpg","http://"+ IPCAM_IP +"/out.jpg");
-     LINE.notifyPicture("\n [อัตโนมัติ] \n ตรวจพบการเคลื่อนไหว \n \n ห้องหมายเลข : 18054 \n วันที่ : "+String(currentDate)+" \n เวลา : "+String(timeClient.getFormattedTime())+" ", SPIFFS, "/snapshot.jpg");  
-     Serial.println("Send message");
-
-  /*
-  if(ipCameraEnabled){
-     downloadAndSaveFile("/snapshot.jpg","http://"+ IPCAM_IP +"/out.jpg");
-     LINE.notifyPicture("\n [อัตโนมัติ] \n ตรวจพบการเคลื่อนไหว \n \n ห้องหมายเลข : 18054  \n เวลา : "+String(timeClient.getFormattedTime())+" ", SPIFFS, "/snapshot.jpg");  
-     Serial.println("Send message");
-  } */
-}
-//////////////////////////////////////////////////////////////////
-
-//////////////////////////////////////////////////////////////////
-/* function DHT */
-void get_dht(){
-  //read dht
-  humn = dht.readHumidity();
-  temp = dht.readTemperature();
-  //chk dht
-  if(isnan(humn) || isnan(temp)){
-    Serial.println("DHT ERROR");
-   // digitalWrite(led_alert_DHT, LOW);
-    LED_DHT22_ONLINE.off();
-    LED_DHT22_OFFLINE.on();
-    humn = 0;
-    temp = 0;
-    //delay(1500);
-    //return;
-  }
-  else{
-    Serial.print("HUM : ");
-    Serial.print(humn);
-    Serial.println(" %");
-    Serial.println("");
-    Serial.print("Temp : ");
-    Serial.print(temp);
-    Serial.println(" C");
-
-   // digitalWrite(led_alert_DHT, HIGH);
-    LED_DHT22_ONLINE.on();
-    LED_DHT22_OFFLINE.off();
-    
-  }
-  Blynk.virtualWrite(V5, humn);
-  Blynk.virtualWrite(V6, temp);
-}
-//////////////////////////////////////////////////////////////////
-
-//////////////////////////////////////////////////////////////////
-//button pir
-BLYNK_WRITE(V2){
-  if(param.asInt()){
-      PIR_Button = 1;
-      
-  }
-  else{
-      PIR_Button = 0;
-  }
-}
-//////////////////////////////////////////////////////////////////
-BLYNK_WRITE(V10){
-  if(param.asInt()){
-    Blynk.virtualWrite(V11, "ระบบอัตโนมัติโดนบังคับปิด");
-    PIR_Close = 1;
-  }
-  else{
-     PIR_Close = 0;
-     Blynk.virtualWrite(V11, "ระบบอัตโนมัติทำงานโดยอัตโนมัติ");
-     Serial.println("ระบบอัตโนมัติทำงานโดยอัตโนมัติ");
-     send_notify = true;
-  }
-}
-
-
-BLYNK_WRITE(V9){
-  if(param.asInt()){
-    Serial.println("BUZZER TEST!!!!");
-    digitalWrite(Buzzer, HIGH);
-  }
-  else{
-    digitalWrite(Buzzer, LOW);
-    
-  }
-}
-
-BLYNK_WRITE(V12){
-  if(param.asInt()){
-    Buzzer_Button = 1;
-  }
-  else{
-    Buzzer_Button = 0;
-    Buzzer_Status = 0;
-  }
-}
-
-BLYNK_WRITE(V13){
-  if(param.asInt()){
-    Buzzer_Status = 1;
-  }
-  else{
-    Buzzer_Status = 0;
-  }
-}
-
-BLYNK_WRITE(V14){
-  if(param.asInt()){
-    Buzzer_Status = 2;
-  }
-  else{
-    Buzzer_Status = 0;
-  }
-}
-
-//////////////////////////////////////////////////////////////////
-/* pir senesor */
-void get_pir(){
-
-  PIR_Read = digitalRead(PIR);
-  if(isnan(PIR_Read)){
-    Serial.println("PIR ERROR");
-    Blynk.virtualWrite(V2, 0);
-    pir_val = 0;
-  }
-  else{
-    pir_val = digitalRead(PIR);
-  }
-    
-}
-//////////////////////////////////////////////////////////////////
-
-void get_Buzzer_Fc1(){
-
-  digitalWrite(Buzzer, HIGH);
-  delay(1000);
-  digitalWrite(Buzzer, LOW);  
-  delay(100);
-  
-}
-
-void get_Buzzer_Fc2(){
-
-   if(Buzzer_once == true){
-      digitalWrite(Buzzer, HIGH);
-      delay(100);
-      digitalWrite(Buzzer, LOW);  
-      delay(100);
-      digitalWrite(Buzzer, HIGH);
-      delay(100);
-      digitalWrite(Buzzer, LOW);      
-      Buzzer_once = false;
-      Buzzer_Status = 0;
-      Blynk.virtualWrite(V14, 0);
-   }
-
-}
-
-//////////////////////////////////////////////////////////////////
-
-void get_DHT_LineNotify(){
-  if(temp < 30){ //ถ้าอุณหภูมิมากกว่า 26 ให้ทำอะไร
-    send_notify = true;
-    LINE.notify("อัตโนมัติ \n มีโอกาสที่ห้องไม่ได้ปิดแอร์ \n อุณหภูมิตอนนี้ :  "+String(temp)+" C \n เวลา : "+String(timeClient.getFormattedTime())+"");
-    delay(300000);
-  }
-  else{
-    if(send_notify == true){
-      LINE.notify("อัตโนมัติ \n ห้องอุณหภูมิปกติ \n อุณหภูมิตอนนี้ : "+String(temp)+" C \n เวลา : "+String(timeClient.getFormattedTime())+"");
-      send_notify = false;
-    }
-  }
-}
-
-void get_Automatic_PIR(){
-  Serial.println("get_Automatic_PIR_ONLINE");
-  if(timeClient.isTimeSet()) {
-    if (PIR_START_hour == timeClient.getHours() && PIR_START_minute == timeClient.getMinutes()) {
-           
-                   
-  
-    } else if (PIR_START_hour_PM <= timeClient.getHours() || PIR_START_hour_AM >= timeClient.getHours())  {
-            Automatic_PIR_Status = 1;            
-            pir_on_once = true;   
-            Serial.println("เริ่มทำงานอัตโนมัติ");    
-        }
-    if (PIR_END_hour == timeClient.getHours() && PIR_END_minute == timeClient.getMinutes()) {
-
-        Serial.println("หยุดการทำงานอัตโนมัติ.");                    
-        Automatic_PIR_Status = 0; 
-
-    }
-  }
-}
