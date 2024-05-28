@@ -1,11 +1,14 @@
 #include <ESP8266WiFi.h>
 #include <WiFiUdp.h>
+#include <BlynkSimpleEsp8266.h>
+
 
 #include <WakeOnLan.h>
 
 WiFiUDP UDP;
 WakeOnLan WOL(UDP);
 
+char auth[] = "iO2uFFq1MVVNy4ynsHdGLLJAox-5qmpe";
 const char* ssid     = "tikxd_2G";
 const char* password = "88888888";
 
@@ -28,6 +31,8 @@ void setup()
 {
     WOL.setRepeat(3, 100); // Optional, repeat the packet three times with 100ms between. WARNING delay() is used between send packet function.
 
+    Blynk.begin(auth, ssid, password, "blynk.cloud", 80);
+
     WiFi.mode(WIFI_STA);
     WiFi.begin(ssid, password);
 
@@ -38,11 +43,25 @@ void setup()
 
     WOL.calculateBroadcastAddress(WiFi.localIP(), WiFi.subnetMask()); // Optional  => To calculate the broadcast address, otherwise 255.255.255.255 is used (which is denied in some networks).
     
-    wakeMyPC();
+   // wakeMyPC();
    // wakeOfficePC();
 }
 
 
 void loop()
 {
+
+    Blynk.run(); // ให้ Blynk ทำงาน
+
 }
+
+BLYNK_WRITE(V1){
+  if(param.asInt()){
+      wakeMyPC();
+      
+  }
+  else{
+    //do nothing
+  }
+}
+
